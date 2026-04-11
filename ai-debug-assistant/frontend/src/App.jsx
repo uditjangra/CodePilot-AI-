@@ -183,7 +183,7 @@ export default function App() {
     setResponse(null);
 
     try {
-      const res = await fetch("http://localhost:8001/debug", {
+      const res = await fetch("/api/debug", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code }),
