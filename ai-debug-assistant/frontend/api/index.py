@@ -3,6 +3,7 @@ import os
 import re
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote_plus
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,10 +42,19 @@ class DebugRequest(BaseModel):
     language: Optional[str] = None
 
 
+class YouTubeRecommendation(BaseModel):
+    title: str
+    reason: str
+    search_query: str
+    url: str
+
+
 class DebugResponse(BaseModel):
     explanation: str
     fix: str
     corrected_code: str
+    problem_summary: str
+    youtube_recommendations: list[YouTubeRecommendation]
 
 
 def get_client():
@@ -147,6 +157,45 @@ def generate_content(prompt: str) -> tuple[str, str]:
     raise HTTPException(status_code=500, detail="Gemini request failed: " + " | ".join(failures))
 
 
+def build_youtube_recommendations(data: dict) -> list[YouTubeRecommendation]:
+    raw_recommendations = data.get("youtube_recommendations", [])
+    recommendations: list[YouTubeRecommendation] = []
+
+    if not isinstance(raw_recommendations, list):
+        raw_recommendations = []
+
+    for item in raw_recommendations[:3]:
+        if not isinstance(item, dict):
+            continue
+
+        title = str(item.get("title") or "Learn the bug topic").strip()
+        reason = str(item.get("reason") or "This topic helps explain the bug and how to avoid it.").strip()
+        search_query = str(item.get("search_query") or title).strip()
+        url = f"https://www.youtube.com/results?search_query={quote_plus(search_query)}"
+
+        recommendations.append(
+            YouTubeRecommendation(
+                title=title,
+                reason=reason,
+                search_query=search_query,
+                url=url,
+            )
+        )
+
+    if recommendations:
+        return recommendations
+
+    fallback_query = "debugging common programming errors tutorial"
+    return [
+        YouTubeRecommendation(
+            title="Debugging common programming errors",
+            reason="This gives a general starting point when the exact bug topic cannot be detected.",
+            search_query=fallback_query,
+            url=f"https://www.youtube.com/results?search_query={quote_plus(fallback_query)}",
+        )
+    ]
+
+
 @app.post("/api/debug", response_model=DebugResponse)
 async def debug_code(request: DebugRequest):
     if not request.code.strip():
@@ -162,12 +211,22 @@ async def debug_code(request: DebugRequest):
 Instructions:
 - If the code has errors, explain what is wrong, suggest a fix, and provide corrected code.
 - If the code has no errors, explain what the code does, say "No fix needed" for the fix, and return the original code as corrected_code.
+- Add a short problem_summary that names the main bug or concept in beginner-friendly language.
+- Recommend exactly 3 YouTube learning searches related to the bug or concept. Do not invent exact YouTube video URLs or video IDs. Use search_query values that would find high-quality tutorials.
 
-Return your response as a valid JSON object with EXACTLY these three keys:
+Return your response as a valid JSON object with EXACTLY these five keys:
 {{
   "explanation": "your explanation here",
   "fix": "your fix suggestion here",
-  "corrected_code": "the corrected or original code here"
+  "corrected_code": "the corrected or original code here",
+  "problem_summary": "one or two sentence summary of the actual problem",
+  "youtube_recommendations": [
+    {{
+      "title": "short recommendation title",
+      "reason": "why this helps with the bug",
+      "search_query": "specific YouTube search phrase"
+    }}
+  ]
 }}
 
 Do NOT wrap the JSON in markdown code fences. Return ONLY the raw JSON object.
@@ -189,6 +248,11 @@ Code:
         explanation=data.get("explanation", "No explanation provided."),
         fix=data.get("fix", "No fix needed."),
         corrected_code=data.get("corrected_code", request.code),
+        problem_summary=data.get(
+            "problem_summary",
+            "The code was analyzed, but no specific problem summary was provided.",
+        ),
+        youtube_recommendations=build_youtube_recommendations(data),
     )
 
 

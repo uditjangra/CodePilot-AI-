@@ -164,6 +164,105 @@ function CodeBlock({ code }) {
 }
 
 /* ─── Main App ─── */
+function YouTubeRecommendations({ summary, recommendations = [] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 12,
+          background: "rgba(239, 68, 68, 0.08)",
+          border: "1px solid rgba(239, 68, 68, 0.18)",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#fca5a5",
+            marginBottom: 8,
+          }}
+        >
+          Problem Summary
+        </p>
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.75,
+            color: "var(--color-text-secondary)",
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {summary || "No problem summary was returned for this debug result."}
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {recommendations.map((video, index) => (
+          <a
+            key={`${video.search_query || video.title}-${index}`}
+            href={video.url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "flex",
+              gap: 14,
+              padding: 14,
+              borderRadius: 12,
+              background: "var(--color-bg-input)",
+              border: "1px solid var(--color-border)",
+              color: "inherit",
+              textDecoration: "none",
+              transition: "transform 0.2s, border-color 0.2s, background 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.borderColor = "#ef4444";
+              e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.borderColor = "var(--color-border)";
+              e.currentTarget.style.background = "var(--color-bg-input)";
+            }}
+          >
+            <span
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                flex: "0 0 auto",
+                display: "grid",
+                placeItems: "center",
+                color: "#fff",
+                background: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)",
+                boxShadow: "0 8px 24px rgba(239, 68, 68, 0.22)",
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M21.58 7.19a2.5 2.5 0 00-1.76-1.77C18.26 5 12 5 12 5s-6.26 0-7.82.42a2.5 2.5 0 00-1.76 1.77A26.26 26.26 0 002 12a26.26 26.26 0 00.42 4.81 2.5 2.5 0 001.76 1.77C5.74 19 12 19 12 19s6.26 0 7.82-.42a2.5 2.5 0 001.76-1.77A26.26 26.26 0 0022 12a26.26 26.26 0 00-.42-4.81zM10 15V9l5.2 3L10 15z" />
+              </svg>
+            </span>
+            <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-text-primary)" }}>
+                {video.title}
+              </span>
+              <span style={{ fontSize: 13, lineHeight: 1.55, color: "var(--color-text-secondary)" }}>
+                {video.reason}
+              </span>
+              <span style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600 }}>
+                Search YouTube: {video.search_query}
+              </span>
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -501,10 +600,27 @@ export default function App() {
               </p>
             </ResultCard>
 
+            {/* YouTube Recommendations */}
+            <ResultCard
+              title="YouTube Learning Recommendations"
+              delay="0.2s"
+              accentColor="#ef4444"
+              icon={
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M21.58 7.19a2.5 2.5 0 00-1.76-1.77C18.26 5 12 5 12 5s-6.26 0-7.82.42a2.5 2.5 0 00-1.76 1.77A26.26 26.26 0 002 12a26.26 26.26 0 00.42 4.81 2.5 2.5 0 001.76 1.77C5.74 19 12 19 12 19s6.26 0 7.82-.42a2.5 2.5 0 001.76-1.77A26.26 26.26 0 0022 12a26.26 26.26 0 00-.42-4.81zM10 15V9l5.2 3L10 15z" />
+                </svg>
+              }
+            >
+              <YouTubeRecommendations
+                summary={response.problem_summary}
+                recommendations={response.youtube_recommendations}
+              />
+            </ResultCard>
+
             {/* Corrected Code */}
             <ResultCard
               title="Corrected Code"
-              delay="0.2s"
+              delay="0.3s"
               accentColor="#22c55e"
               icon={
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
