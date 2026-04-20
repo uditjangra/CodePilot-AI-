@@ -1,4 +1,11 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { auth, authPersistenceReady, isFirebaseConfigured } from "./firebase";
 
 /* ─── Icons ─── */
 const BugIcon = () => (
@@ -37,6 +44,208 @@ const Spinner = () => (
 );
 
 /* ─── Result Card ─── */
+function getAuthErrorMessage(error) {
+  const code = error?.code || "";
+
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password") {
+    return "That email or password is not correct.";
+  }
+
+  if (code === "auth/user-not-found") {
+    return "No account was found for that email.";
+  }
+
+  if (code === "auth/email-already-in-use") {
+    return "An account already exists for that email.";
+  }
+
+  if (code === "auth/weak-password") {
+    return "Use a password with at least 6 characters.";
+  }
+
+  if (code === "auth/invalid-email") {
+    return "Enter a valid email address.";
+  }
+
+  return error?.message || "Authentication failed. Please try again.";
+}
+
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("login");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const isCreateMode = mode === "create";
+
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!isFirebaseConfigured || !auth) {
+      setAuthError("Firebase is not configured yet. Add your Firebase web app values to frontend/.env.");
+      return;
+    }
+
+    setAuthError("");
+    setAuthLoading(true);
+
+    try {
+      await authPersistenceReady;
+      if (isCreateMode) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error));
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "48px 20px",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <main
+        className="animate-fade-in-up"
+        style={{
+          width: "100%",
+          maxWidth: 420,
+          background: "var(--color-bg-card)",
+          border: "1px solid var(--color-border)",
+          borderRadius: 16,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ padding: "28px 28px 18px", borderBottom: "1px solid var(--color-border)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, color: "var(--color-accent)", marginBottom: 16 }}>
+            <BugIcon />
+            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+              Debug Assistant
+            </span>
+          </div>
+          <h1 style={{ fontSize: 28, lineHeight: 1.15, marginBottom: 10 }}>Sign in to continue</h1>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 14, lineHeight: 1.6 }}>
+            Your browser will remember this login. Another browser or device will ask you to sign in again.
+          </p>
+        </div>
+
+        <form onSubmit={handleAuthSubmit} style={{ padding: 28, display: "grid", gap: 16 }}>
+          {!isFirebaseConfigured && (
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: 8,
+                border: "1px solid rgba(251, 191, 36, 0.28)",
+                background: "rgba(251, 191, 36, 0.09)",
+                color: "var(--color-warning)",
+                fontSize: 13,
+                lineHeight: 1.55,
+              }}
+            >
+              Firebase config is missing. Copy frontend/.env.example to frontend/.env and add your Firebase web app values.
+            </div>
+          )}
+
+          <label style={{ display: "grid", gap: 8, color: "var(--color-text-secondary)", fontSize: 13, fontWeight: 600 }}>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              required
+              style={{
+                width: "100%",
+                padding: "13px 14px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                outline: "none",
+                background: "var(--color-bg-input)",
+                color: "var(--color-text-primary)",
+                font: "inherit",
+              }}
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: 8, color: "var(--color-text-secondary)", fontSize: 13, fontWeight: 600 }}>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="At least 6 characters"
+              autoComplete={isCreateMode ? "new-password" : "current-password"}
+              required
+              minLength={6}
+              style={{
+                width: "100%",
+                padding: "13px 14px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                outline: "none",
+                background: "var(--color-bg-input)",
+                color: "var(--color-text-primary)",
+                font: "inherit",
+              }}
+            />
+          </label>
+
+          {authError && (
+            <p style={{ color: "var(--color-error)", fontSize: 13, lineHeight: 1.5 }}>{authError}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={authLoading || !isFirebaseConfigured}
+            style={{
+              width: "100%",
+              padding: "14px",
+              borderRadius: 8,
+              border: "none",
+              cursor: authLoading || !isFirebaseConfigured ? "not-allowed" : "pointer",
+              background: authLoading || !isFirebaseConfigured
+                ? "rgba(139, 92, 246, 0.3)"
+                : "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+              color: authLoading || !isFirebaseConfigured ? "rgba(255,255,255,0.65)" : "#fff",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
+          >
+            {authLoading ? "Please wait..." : isCreateMode ? "Create Account" : "Login"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode(isCreateMode ? "login" : "create");
+              setAuthError("");
+            }}
+            style={{
+              border: "none",
+              background: "transparent",
+              color: "var(--color-accent-hover)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {isCreateMode ? "Already have an account? Login" : "Need an account? Create one"}
+          </button>
+        </form>
+      </main>
+    </div>
+  );
+}
+
 function ResultCard({ title, icon, children, delay, accentColor }) {
   return (
     <div
@@ -264,12 +473,28 @@ function YouTubeRecommendations({ summary, recommendations = [] }) {
 }
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authReady, setAuthReady] = useState(!isFirebaseConfigured);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState("");
   const textareaRef = useRef(null);
   const resultsRef = useRef(null);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setAuthReady(true);
+      return undefined;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthReady(true);
+    });
+
+    return unsubscribe;
+  }, []);
 
   const handleDebug = async () => {
     if (!code.trim()) {
@@ -314,7 +539,26 @@ export default function App() {
     textareaRef.current?.focus();
   };
 
+  const handleSignOut = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    setResponse(null);
+    setError("");
+  };
+
   const lineCount = code ? code.split("\n").length : 0;
+
+  if (!authReady) {
+    return (
+      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", color: "var(--color-text-secondary)" }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
 
   return (
     <div
@@ -327,6 +571,39 @@ export default function App() {
       }}
     >
       {/* ── Header ── */}
+      <div
+        className="animate-fade-in"
+        style={{
+          width: "100%",
+          maxWidth: 720,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 12,
+          marginBottom: 24,
+        }}
+      >
+        <span style={{ color: "var(--color-text-muted)", fontSize: 12 }}>
+          {currentUser.email}
+        </span>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          style={{
+            border: "1px solid var(--color-border)",
+            background: "var(--color-bg-card)",
+            color: "var(--color-text-secondary)",
+            borderRadius: 8,
+            padding: "8px 12px",
+            cursor: "pointer",
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
+
       <header className="animate-fade-in-up" style={{ textAlign: "center", marginBottom: 40 }}>
         <div
           style={{
